@@ -24,17 +24,17 @@ int main(void) {
 
 	// przewijanie mapy
 
-	int xOff = -500;
-	int yOff = -500;
+	int mapa_x = -500;
+	int mapa_y = -500;
 
-	int mapColumns = 30;
-	int mapSize = 900;
-	int tileSize = 50;
-
-
+	int szerokosc_mapy = 30;  // ilosc w jednej linii kolumn 50x50
+	int rozmiar_mapy = 900;   // lacznie ile jest kolumn 50x50
+	int rozmiar_pola = 50;
 
 
-	int map[] =
+
+
+	int mapa[] =
 	  { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -264,15 +264,15 @@ int main(void) {
 		}
 		else if (ev.type == ALLEGRO_EVENT_TIMER)
 		{
-				xOff -= wsad[D] * 1;
-				xOff += wsad[A] * 1;
-				yOff -= wsad[S] * 1;
-				yOff += wsad[W] * 1;
+				mapa_x -= wsad[D] * 1;
+				mapa_x += wsad[A] * 1;
+				mapa_y -= wsad[S] * 1;
+				mapa_y += wsad[W] * 1;
 
 
 
 
-				if (xOff < -250 || yOff <-800 || xOff > 0 || yOff > 0)
+				if (mapa_x < -250 || mapa_y <-800 || mapa_x > 0 || mapa_y > 0)
 				{
 					pos_x += wsad[D] * (predkosc_linia_prosta/2);
 					pos_x -= wsad[A] * (predkosc_linia_prosta/2);  // mapa zablowana
@@ -290,14 +290,14 @@ int main(void) {
 					
 
 				// warunki przewijania mapy
-				if (xOff < -250)
-					xOff = -250;
-				if (yOff < -800)
-					yOff = -800;
-				if (xOff > 0)
-					xOff = 0;
-				if (yOff > 0)
-					yOff = 0;
+				if (mapa_x < -250)
+					mapa_x = -250;
+				if (mapa_y < -800)
+					mapa_y = -800;
+				if (mapa_x > 0)
+					mapa_x = 0;
+				if (mapa_y > 0)
+					mapa_y = 0;
 
 			// postac nie moze wyjsc poza obszar okna
 				if (pos_x < 0)
@@ -311,10 +311,10 @@ int main(void) {
 
 			redraw = true;
 
-			for (int i = 0; i < mapSize; i++)
+			for (int i = 0; i < rozmiar_mapy; i++)
 			{
-				al_draw_bitmap_region(bgImage, tileSize * map[i], 0, tileSize, tileSize,
-					xOff + tileSize * (i % mapColumns), yOff + tileSize * (i / mapColumns), 0);
+				al_draw_bitmap_region(bgImage, rozmiar_pola * mapa[i], 0, rozmiar_pola, rozmiar_pola,
+					mapa_x + rozmiar_pola * (i % szerokosc_mapy), mapa_y + rozmiar_pola * (i / szerokosc_mapy), 0);
 			}
 
 
