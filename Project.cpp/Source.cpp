@@ -12,6 +12,8 @@ enum RuchOrka { Gora, Dol, Lewo, Prawo, LewoGora, LewoDol, PrawoGora, PrawoDol }
 RuchOrka PozycjaOrka[8] = { Gora,Gora,Gora,Gora,Gora,Gora,Gora,Gora };
 enum przeciwnik { PRZECIWNIK };
 enum pocisk { POCISK };
+enum szaman { SZAMAN };
+enum pocisk_szamana {POCISKSZAMANA};
 
 struct Ork
 {
@@ -26,11 +28,61 @@ struct Ork
 	int ktoryX_ork;
 	int ktoryY_ork;
 	int hp;
-	bool efekt_pocisku;
+	bool efekt_pocisku_sopel;
+	bool efekt_pocisku_trucizna;
 	int pomocnicza_do_efektu;
 	bool efekt_krwi;
 	int pomocnicza_do_krwi;
 	ALLEGRO_BITMAP *OrkSprite[51];
+};
+struct PociskSzamana
+{
+	int ID;
+	float x;
+	float y;
+	bool live;
+	float predkosc;
+	int ktoryX_pocisk_szamana;
+	int ktoryY_pocisk_szamana;
+	float odleglosc_x;  // a (postac i kursor)
+	float odleglosc_y;  // b (postac i kursor)
+	float odleglosc_xy; // c (postac i kursor)
+	float sinus;        // sinus pomiedzy postacia a kursorem
+	float cosinus;      // cosinus pomiedzy postacia a kursorem
+	int kierunek;
+	int rodzaj_pocisku;
+	ALLEGRO_BITMAP *pocisk_szamana[12];
+	bool czy_moze_strzelic_szaman;
+};
+
+struct Szaman
+{
+	int ID;
+	float x;
+	float y;
+	bool live;
+	float predkosc;
+	int boundx;
+	int boundy;
+	int a;
+	int ktoryX_szaman;
+	int ktoryY_szaman;
+	int hp;
+	bool efekt_pocisku_sopel;
+	bool efekt_pocisku_trucizna;
+	int pomocnicza_do_efektu;
+	bool efekt_krwi;
+	int pomocnicza_do_krwi;
+	ALLEGRO_BITMAP *SzamanSprite[51];
+	int PozycjaSzamana;  // 1 - prawo, 2 - lewo, 3 - dol, 4 - gora, 5 - lewogora, 6 - lewodol, 7 - prawogora, 8 - prawodol
+	float odleglosc_x;  // a (postac i szaman)
+	float odleglosc_y;  // b (postac i szaman)
+	float odleglosc_xy; // c (postac i szaman)
+	float sinus;        // sinus pomiedzy postacia a szamanem
+	float cosinus;      // cosinus pomiedzy postacia a szamanem
+	int kierunek;
+	int pomocnicza_do_strzalu_szamana;
+	PociskSzamana pociski_szamana;
 };
 
 struct Pocisk
@@ -51,6 +103,15 @@ struct Pocisk
 	int rodzaj_pocisku;
 	ALLEGRO_BITMAP *pocisk[36];
 };
+
+// dmg strzalek
+float fireball_dmg = 25;
+float sopel_dmg = 20;
+float trucizna_dmg = 15;
+
+// losowanie
+int losowanie_orka=500;
+int losowanie_szamana=100;
 
 // wczytanie czcionki
 ALLEGRO_FONT *font24 = al_load_ttf_font("centuary.ttf", 24, 0);
@@ -75,12 +136,24 @@ void StartOrk(Ork orkowie[], int ile);
 void RuchOrk(Ork orkowie[], int ile);
 void Sciezka(float pos_x, float pos_y, float &  przeciwnik_x, float & przeciwnik_y, float predkosc_orka, int ktoryX_ork, int ktoryY_ork, int ile);
 
+//szamani
+void InitSzaman(Szaman szamani[], int ile);
+void DrawSzaman(Szaman szamani[], int ile, int pomocnicza_do_sprite_szamana);
+void StartSzaman(Szaman szamani[], int ile);
+void RuchSzaman(Szaman szamani[], int ile);
+void SciezkaSzamana(float pos_x, float pos_y, float &  przeciwnik_x, float & przeciwnik_y, float predkosc_szamana, int ile, int & PozycjaSzamana);
+
 // pociski
 void InitPocisk(Pocisk pociski[], int ile);
 void DrawPocisk(Pocisk pociski[], int ile);
 void StartPocisk(Pocisk pociski[], int ile, float pos_x, float pos_y);
 void RuchPocisk(Pocisk pociski[], int ile);
 
+// pociski szamana
+void InitPociskSzamana(int ile,Szaman szamani[]);
+void DrawPociskSzamana( int ile, Szaman szamani[]);
+void StartPociskSzamana( int ile, Szaman szamani[]);
+void RuchPociskSzamana( int ile, Szaman szamani[]);
 
 // okno 
 int szerokosc = 1250;
@@ -105,9 +178,12 @@ float predkosc_postaci = 2;
 float pos_hp = 100;
 
 // orkowie
-const int ilosc_orkow = 10;
-char ostatni_ruch_orka;
+int ilosc_orkow = 10;
 int pomocnicza_do_sprite_orka = 0;
+
+// szamani
+int ilosc_szamanow = 5;
+int pomocnicza_do_sprite_szamana = 0;
 
 // pociski
 const int ilosc_pociskow = 5; // ktore moga istniec jednoczesnie
@@ -125,18 +201,24 @@ float pieniadze=100;
 float doswiadczenie;
 int level = 1;
 int level_up = 0;
+float score=0;
 
 // pomocnicza do timera
 int pomocnicza_do_straty_hp = 0;
 int pomocnicza_do_konca_gry_przegrana;
 int pomocnicza_do_konca_gry_wygrana;
+int pomocnicza_do_straty_hp2;
 
 // zegar
 int zegar;
 float czas = 0;
 
+// rest orka w tym samym miejscu
+float resp_prawo_gora_x = 0;
+float resp_prawo_gora_y = 0;
+
 // faza gry
-int faza_gry = 1; // 1 - menu glowne, 2 - jak grac, 3 - gra , 4 - sklep
+int faza_gry = 1; // 1 - menu glowne, 2 - jak grac, 3 - gra , 4 - sklep, 5 - wynik
 
 // 0 trawa 1 wieza 2 domek 3,4,5,6 hall 7 krzak 8 suchedrzewo 9 drzewo 10 woda 11 most
 int mapa[] =
@@ -162,8 +244,8 @@ int mapa[] =
 	7, 7, 0, 0, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9,
 	7, 7, 0, 0, 8, 8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8, 7, 0, 0, 7,
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7, 7, 0, 0, 7,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
+	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
 	9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 7,
 	9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 7, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 9, 9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -180,11 +262,10 @@ int main(void) {
 
 
 	//przeciwnicy
-	Ork orkowie[ilosc_orkow];
-
+	Ork orkowie[50];
+	Szaman szamani[50];
 	// pociski
 	Pocisk pociski[ilosc_pociskow];
-
 	// pomocnicza do sprite postaci
 	char ostatnia_pozycja;
 
@@ -245,8 +326,11 @@ int main(void) {
 	srand(time(NULL));
 
 	// orkowie
-	InitOrk(orkowie, ilosc_orkow);
+	InitOrk(orkowie, 50);
 
+	//szamani
+	InitSzaman(szamani, 50);
+	InitPociskSzamana(ilosc_szamanow,szamani);
 	// pociski
 	InitPocisk(pociski, ilosc_pociskow);
 
@@ -314,7 +398,7 @@ int main(void) {
 	}
 
 	// mapa
-	bgImage = al_load_bitmap("background2.png");
+	bgImage = al_load_bitmap("background.png");
 
 	// ekran startowy
 	ALLEGRO_BITMAP *Ekran_startowy = al_load_bitmap("Ekran startowy.png");
@@ -336,6 +420,8 @@ int main(void) {
 	ALLEGRO_BITMAP *Sklep = al_load_bitmap("Sklep/Sklep.png");
 	ALLEGRO_BITMAP *Pocisk_lodu = al_load_bitmap("Sklep/Pocisk lodu.png");
 	ALLEGRO_BITMAP *Pocisk_trucizny = al_load_bitmap("Sklep/Pocisk trucizny.png");
+	// ekran wynikow
+	ALLEGRO_BITMAP *Wynik = al_load_bitmap("Ikony/Wynik.png");
 
 	// okno
 	okno = al_create_display(szerokosc, wysokosc);
@@ -361,7 +447,10 @@ int main(void) {
 	float kursor_y3;
 	float kursor_x4;
 	float kursor_y4;
+	float kursor_x5;
+	float kursor_y5;
 
+	
 	// timer
 	al_start_timer(timer);
 
@@ -371,6 +460,7 @@ int main(void) {
 	al_flip_display();
 	al_rest(1.5);
 
+	//sklep
 	bool czy_ma_wyswietlac1 = false;
 	bool czy_ma_wyswietlac2 = false;
 	float cena_sopla = 100;
@@ -539,17 +629,14 @@ int main(void) {
 					if (RodzajPocisku == 1 && ilosc_fireball > 0)
 					{
 						StartPocisk(pociski, ilosc_pociskow, pos_x, pos_y);
-						ilosc_fireball -= 1;
 					}
 					if (RodzajPocisku == 2 && ilosc_sopel > 0)
 					{
 						StartPocisk(pociski, ilosc_pociskow, pos_x, pos_y);
-						ilosc_sopel -= 1;
 					}
 					if (RodzajPocisku == 3 && ilosc_trucizna > 0)
 					{
 						StartPocisk(pociski, ilosc_pociskow, pos_x, pos_y);
-						ilosc_trucizna -= 1;
 					}
 				}
 			}
@@ -577,19 +664,41 @@ int main(void) {
 				{
 					czas++;
 				}
+				if(zegar%600==0)
+				{
+					if(losowanie_orka>200)
+						losowanie_orka -= 25;
+					if(losowanie_szamana>40)
+						losowanie_szamana -= 5;
+					if (ilosc_orkow < 20)
+						ilosc_orkow + 1;
+					if (ilosc_szamanow<10)
+						ilosc_szamanow += 1;
+
+					for(int i=0; i<50; i++)
+					{ 
+						orkowie[i].hp += 5;
+						szamani[i].hp += 10;
+					}
+				}
 				pomocnicza_do_sprite_orka++;
+				pomocnicza_do_sprite_szamana++;
+
 				StartOrk(orkowie, ilosc_orkow);
+				StartSzaman(szamani, ilosc_szamanow);
 				RuchOrk(orkowie, ilosc_orkow);
+				RuchSzaman(szamani, ilosc_szamanow);
 				RuchPocisk(pociski, ilosc_pociskow);
+				
 			
 			if (pomocnicza_do_sprite_orka == 50)
 				pomocnicza_do_sprite_orka = 0;
+			if (pomocnicza_do_sprite_szamana == 50)
+				pomocnicza_do_sprite_szamana = 0;
 
 			// pomocnicze by sprawdzac czy mapa sie porusza
 			int pom_mapa_x = mapa_x;
 			int pom_mapa_y = mapa_y;
-			//std::cout << "pom X: " << pom_mapa_x << std::endl;
-			//std::cout << "pom Y: " << pom_mapa_y << std::endl;
 			// warunki przewijania mapy
 			
 				if (mapa_x < 0)
@@ -611,310 +720,199 @@ int main(void) {
 				mapa_x = 0;
 			if (mapa_y > 0)
 				mapa_y = 0;
-			//std::cout << "mapa X: " << mapa_x << std::endl;
-			//std::cout << "mapa Y: " << mapa_y << std::endl;
 
-			// mapa nie porusza postaci
-			if (faza_gry==2)
+			// mapa nie porusza ...
+			if (faza_gry == 2)
 			{
-				if (((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == true)))
+				// mapa nie porusza postaci
+				if (faza_gry == 2)
 				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+					if (((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == true)))
 					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							resp_prawo_gora_y -=predkosc_postaci ;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y += predkosc_mapy;
+							resp_prawo_gora_y -= predkosc_postaci;
+						}
 					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+
+					if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
 					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y += predkosc_mapy;
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y += predkosc_mapy;
+							pos_x += predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y += predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x += predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+					}
+
+					if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
+					{
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y += predkosc_mapy;
+							pos_x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y += predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+					}
+
+
+					if (((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[S] == true)))
+					{
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x += predkosc_mapy;
+						}
+					}
+
+					if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x += predkosc_mapy;
+							pos_y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x += predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+					}
+
+
+					if (((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[S] == true) && (wsad[A] == true) && (wsad[D] == true)))
+					{
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y -= predkosc_mapy;
+						}
+					}
+
+					if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
+					{
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y -= predkosc_mapy;
+							pos_x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+					}
+
+
+					if (((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false)) || ((wsad[W] == true) && (wsad[D] == true) && (wsad[S] == true)))
+					{
+						KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
+							pos_x -= predkosc_mapy;
+						}
 					}
 				}
 
-				if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
+				// mapa nie porusza orkow
+				for (int i = 0; i < ilosc_orkow; i++)
 				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y += predkosc_mapy;
-						pos_x += predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y += predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x += predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-				}
 
-				if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
-				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y += predkosc_mapy;
-						pos_x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y += predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-				}
-
-
-				if (((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[S] == true)))
-				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x += predkosc_mapy;
-					}
-				}
-
-				if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x += predkosc_mapy;
-						pos_y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x += predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciA(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-				}
-
-
-				if (((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[S] == true) && (wsad[A] == true) && (wsad[D] == true)))
-				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y -= predkosc_mapy;
-					}
-				}
-
-				if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
-				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y -= predkosc_mapy;
-						pos_x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciS(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-				}
-
-
-				if (((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false)) || ((wsad[W] == true) && (wsad[D] == true) && (wsad[S] == true)))
-				{
-					KtoryXY(pos_x, pos_y, mapa_x, mapa_y, ktoryX, ktoryY);
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						RuchPostaciD(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-						pos_x -= predkosc_mapy;
-					}
-				}
-			}
-
-			// mapa nie porusza orkow
-			for (int i = 0; i < ilosc_orkow; i++)
-			{
-
-				if (((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == true)))
-				{
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y += predkosc_mapy;
-					}
-				}
-
-				if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y += predkosc_mapy;
-						orkowie[i].x += predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y += predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x += predkosc_mapy;
-					}
-				}
-
-				if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y += predkosc_mapy;
-						orkowie[i].x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y += predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x -= predkosc_mapy;
-					}
-				}
-
-
-				if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x += predkosc_mapy;
-					}
-				}
-
-				if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].x += predkosc_mapy;
-						orkowie[i].y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x += predkosc_mapy;
-					}
-				}
-
-
-				if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false))
-				{
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].y -= predkosc_mapy;
-					}
-				}
-
-				if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y -= predkosc_mapy;
-						orkowie[i].x -= predkosc_mapy;
-					}
-					if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
-					{
-						orkowie[i].y -= predkosc_mapy;
-					}
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x -= predkosc_mapy;
-					}
-				}
-
-
-				if ((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false))
-				{
-					if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
-					{
-						orkowie[i].x -= predkosc_mapy;
-					}
-				}
-
-			}
-
-			// mapa nie porusza pociskow
-			for (int i = 0; i < ilosc_pociskow; i++)
-			{
-				if (pociski[i].live)
-				{
-					if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false))
+					if (((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == true)))
 					{
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y += predkosc_mapy;
+							orkowie[i].y += predkosc_mapy;
 						}
 					}
 
@@ -922,16 +920,16 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y += predkosc_mapy;
-							pociski[i].x += predkosc_mapy;
+							orkowie[i].y += predkosc_mapy;
+							orkowie[i].x += predkosc_mapy;
 						}
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y += predkosc_mapy;
+							orkowie[i].y += predkosc_mapy;
 						}
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x += predkosc_mapy;
+							orkowie[i].x += predkosc_mapy;
 						}
 					}
 
@@ -939,16 +937,16 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y += predkosc_mapy;
-							pociski[i].x -= predkosc_mapy;
+							orkowie[i].y += predkosc_mapy;
+							orkowie[i].x -= predkosc_mapy;
 						}
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y += predkosc_mapy;
+							orkowie[i].y += predkosc_mapy;
 						}
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x -= predkosc_mapy;
+							orkowie[i].x -= predkosc_mapy;
 						}
 					}
 
@@ -957,7 +955,7 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x += predkosc_mapy;
+							orkowie[i].x += predkosc_mapy;
 						}
 					}
 
@@ -965,16 +963,16 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].x += predkosc_mapy;
-							pociski[i].y -= predkosc_mapy;
+							orkowie[i].x += predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
 						}
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y -= predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
 						}
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x += predkosc_mapy;
+							orkowie[i].x += predkosc_mapy;
 						}
 					}
 
@@ -983,11 +981,11 @@ int main(void) {
 					{
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y -= predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
 						}
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].y -= predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
 						}
 					}
 
@@ -995,16 +993,16 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y -= predkosc_mapy;
-							pociski[i].x -= predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
+							orkowie[i].x -= predkosc_mapy;
 						}
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
-							pociski[i].y -= predkosc_mapy;
+							orkowie[i].y -= predkosc_mapy;
 						}
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x -= predkosc_mapy;
+							orkowie[i].x -= predkosc_mapy;
 						}
 					}
 
@@ -1013,10 +1011,353 @@ int main(void) {
 					{
 						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
 						{
-							pociski[i].x -= predkosc_mapy;
+							orkowie[i].x -= predkosc_mapy;
+						}
+					}
+
+				}
+
+				//mapa nie porusza szamanow
+				for (int i = 0; i < ilosc_szamanow; i++)
+				{
+
+					if (((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false)) || ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == true)))
+					{
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y += predkosc_mapy;
+						}
+					}
+
+					if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y += predkosc_mapy;
+							szamani[i].x += predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y += predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x += predkosc_mapy;
+						}
+					}
+
+					if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y += predkosc_mapy;
+							szamani[i].x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y += predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x -= predkosc_mapy;
+						}
+					}
+
+
+					if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x += predkosc_mapy;
+						}
+					}
+
+					if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].x += predkosc_mapy;
+							szamani[i].y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x += predkosc_mapy;
+						}
+					}
+
+
+					if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false))
+					{
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].y -= predkosc_mapy;
+						}
+					}
+
+					if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y -= predkosc_mapy;
+							szamani[i].x -= predkosc_mapy;
+						}
+						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+						{
+							szamani[i].y -= predkosc_mapy;
+						}
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x -= predkosc_mapy;
+						}
+					}
+
+
+					if ((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false))
+					{
+						if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+						{
+							szamani[i].x -= predkosc_mapy;
+						}
+					}
+
+				}
+
+				// mapa nie porusza pociskow
+				for (int i = 0; i < ilosc_pociskow; i++)
+				{
+					if (pociski[i].live)
+					{
+						if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y += predkosc_mapy;
+								pociski[i].x += predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y += predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y += predkosc_mapy;
+								pociski[i].x -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y += predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x -= predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].x += predkosc_mapy;
+								pociski[i].y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x += predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].y -= predkosc_mapy;
+							}
+						}
+
+						if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y -= predkosc_mapy;
+								pociski[i].x -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								pociski[i].y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x -= predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								pociski[i].x -= predkosc_mapy;
+							}
 						}
 					}
 				}
+				
+				// mapa nie porusza pociskow szamanow
+				for (int i = 0; i < ilosc_pociskow; i++)
+				{
+					if (szamani[i].pociski_szamana.live==true)
+					{
+						if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[W] == true) && (wsad[A] == true) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y += predkosc_mapy;
+								szamani[i].pociski_szamana.x += predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y += predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[W] == true) && (wsad[A] == false) && (wsad[D] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y += predkosc_mapy;
+								szamani[i].pociski_szamana.x -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y += predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x -= predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x += predkosc_mapy;
+							}
+						}
+
+						if ((wsad[A] == true) && (wsad[W] == false) && (wsad[S] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.x += predkosc_mapy;
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x += predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == false))
+						{
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+							}
+						}
+
+						if ((wsad[S] == true) && (wsad[A] == false) && (wsad[D] == true))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+								szamani[i].pociski_szamana.x -= predkosc_mapy;
+							}
+							if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
+							{
+								szamani[i].pociski_szamana.y -= predkosc_mapy;
+							}
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x -= predkosc_mapy;
+							}
+						}
+
+
+						if ((wsad[D] == true) && (wsad[W] == false) && (wsad[S] == false))
+						{
+							if ((pom_mapa_x != mapa_x) && (pom_mapa_y == mapa_y))
+							{
+								szamani[i].pociski_szamana.x -= predkosc_mapy;
+							}
+						}
+					}
+				}
+				
 			}
 
 			// kolizja pocisk-ork oraz postac-ork
@@ -1027,56 +1368,55 @@ int main(void) {
 				{
 					if (orkowie[i].live == true)
 					{
-						if (faza_gry==2)
-						{
 							// efekt sopla
-							if (orkowie[i].efekt_pocisku == true && pociski[j].rodzaj_pocisku == 2)
+							if (orkowie[i].efekt_pocisku_sopel == true)
 							{
-								orkowie[i].predkosc = 0.5; // slow na ~~3,5sec
+								orkowie[i].predkosc = 0.0; // slow na ~~5sec
 								orkowie[i].pomocnicza_do_efektu++;
-								if (orkowie[i].pomocnicza_do_efektu == 210)
+								if (orkowie[i].pomocnicza_do_efektu == 1300)
 								{
 									orkowie[i].predkosc = 1;
-									orkowie[i].efekt_pocisku = false;
+									orkowie[i].efekt_pocisku_sopel = false;
 									orkowie[i].pomocnicza_do_efektu = 0;
 								}
 							}
 							// efekt trucizny
-							if (orkowie[i].efekt_pocisku == true && pociski[j].rodzaj_pocisku == 3 && orkowie[i].hp > 6)
+							if (orkowie[i].efekt_pocisku_trucizna == true)
 							{
 								orkowie[i].pomocnicza_do_efektu++;
-								if (orkowie[i].pomocnicza_do_efektu == 210)
+								if (orkowie[i].pomocnicza_do_efektu == 3000)
 								{
 									orkowie[i].pomocnicza_do_efektu = 0;
-									orkowie[i].efekt_pocisku = false;
+									orkowie[i].efekt_pocisku_trucizna = false;
 								}
-								if (orkowie[i].pomocnicza_do_efektu % 35 == 0)
+								if (orkowie[i].pomocnicza_do_efektu % 250 == 0)
 								{
-									orkowie[i].hp -= 5; // trucizna zabiera 30hp  w ~~3,5sec
+									orkowie[i].hp -= 20; // trucizna zabiera 30hp  w ~~3,5sec
 								}
 							}
-						}
+						
 
 						if (((((orkowie[i].x - 40) <= pociski[j].x - 20) && ((orkowie[i].x + 40) >= pociski[j].x + 20))) &&
 							((((orkowie[i].y - 40) <= pociski[j].y - 20) && ((orkowie[i].y + 40) >= pociski[j].y + 20))))
 						{
+
 							pociski[j].live = false;
 							pociski[j].x = -1000;
 							pociski[j].y = -1000;
 
 							if (pociski[j].rodzaj_pocisku == 1)
 							{
-								orkowie[i].hp -= 40;
+								orkowie[i].hp -= fireball_dmg;
 							}
 							if (pociski[j].rodzaj_pocisku == 2)
 							{
-								orkowie[i].hp -= 20;
-								orkowie[i].efekt_pocisku = true;
+								orkowie[i].hp -= sopel_dmg;
+								orkowie[i].efekt_pocisku_sopel = true;
 							}
 							if (pociski[j].rodzaj_pocisku == 3)
 							{
-								orkowie[i].hp -= 25;
-								orkowie[i].efekt_pocisku = true;
+								orkowie[i].hp -= trucizna_dmg;
+								orkowie[i].efekt_pocisku_trucizna = true;
 							}
 						}
 					}
@@ -1085,11 +1425,13 @@ int main(void) {
 				{
 
 					orkowie[i].live = false;
-					pieniadze += 50;
+					pieniadze += 150;
 					doswiadczenie += 10;
+					score += 10;
 					orkowie[i].hp = 100;
 					orkowie[i].predkosc = 1;
-					orkowie[i].efekt_pocisku = false;
+					orkowie[i].efekt_pocisku_sopel = false;
+					orkowie[i].efekt_pocisku_trucizna = false;
 					orkowie[i].efekt_krwi = true;
 				}
 
@@ -1110,21 +1452,145 @@ int main(void) {
 				}
 			}
 
+			// kolizcja pocisk-szaman oraz szaman-postac - pociski postaci
+			for (int i = 0; i < ilosc_szamanow; i++)
+			{
+				if (szamani[i].live == true)
+				{
+					if (szamani[i].odleglosc_xy <= 400)
+					{
+						if (szamani[i].pociski_szamana.czy_moze_strzelic_szaman == false)
+						{
+							szamani[i].pomocnicza_do_strzalu_szamana++;
+							if (szamani[i].pomocnicza_do_strzalu_szamana == 120)
+							{
+								szamani[i].pomocnicza_do_strzalu_szamana = 0;
+								szamani[i].pociski_szamana.czy_moze_strzelic_szaman = true;
+							}
+						}
+						if (szamani[i].pociski_szamana.czy_moze_strzelic_szaman == true)
+						{
+							szamani[i].pociski_szamana.czy_moze_strzelic_szaman = false;
+							StartPociskSzamana(ilosc_szamanow, szamani);
+						}
+					}
+				}
+				for (int j = 0; j < ilosc_pociskow; j++)
+				{
+					if (szamani[i].live == true)
+					{
+							// efekt sopla
+							if (szamani[i].efekt_pocisku_sopel == true)
+							{
+								szamani[i].predkosc = 0.0; // slow na ~~5sec
+								szamani[i].pomocnicza_do_efektu++;
+								if (szamani[i].pomocnicza_do_efektu == 1300)
+								{
+									szamani[i].predkosc = 1;
+									szamani[i].efekt_pocisku_sopel = false;
+									szamani[i].pomocnicza_do_efektu = 0;
+								}
+							}
+							// efekt trucizny
+							if (szamani[i].efekt_pocisku_trucizna == true)
+							{
+								szamani[i].pomocnicza_do_efektu++;
+								if (szamani[i].pomocnicza_do_efektu == 3000)
+								{
+									szamani[i].pomocnicza_do_efektu = 0;
+									szamani[i].efekt_pocisku_trucizna = false;
+								}
+								if (szamani[i].pomocnicza_do_efektu % 250 == 0)
+								{
+									szamani[i].hp -= 20; // trucizna zabiera 30hp  w ~~3,5sec
+								}
+							}
+						
+						
+						if (((((szamani[i].x - 40) <= pociski[j].x - 20) && ((szamani[i].x + 40) >= pociski[j].x + 20))) &&
+							((((szamani[i].y - 40) <= pociski[j].y - 20) && ((szamani[i].y + 40) >= pociski[j].y + 20))))
+						{
+							
+							pociski[j].live = false;
+							pociski[j].x = -1000;
+							pociski[j].y = -1000;
+
+							if (pociski[j].rodzaj_pocisku == 1)
+							{
+								szamani[i].hp -= fireball_dmg;
+							}
+							if (pociski[j].rodzaj_pocisku == 2)
+							{
+								szamani[i].hp -= sopel_dmg;
+								szamani[i].efekt_pocisku_sopel = true;
+							}
+							if (pociski[j].rodzaj_pocisku == 3)
+							{
+								szamani[i].hp -= trucizna_dmg;
+								szamani[i].efekt_pocisku_trucizna = true;
+							}
+						}
+						
+					}
+				}
+				
+				if (szamani[i].hp <= 0)
+				{
+
+					szamani[i].live = false;
+					pieniadze += 250;
+					doswiadczenie += 15;
+					score += 15;
+					szamani[i].hp = 120;
+					szamani[i].predkosc = 1;
+					szamani[i].efekt_pocisku_sopel = false;
+					szamani[i].efekt_pocisku_trucizna = false;
+					szamani[i].efekt_krwi = true;
+				}
+
+				if (szamani[i].live == true)
+				{
+					if (((((szamani[i].x - 40) <= pos_x) && ((szamani[i].x + 40) >= pos_x))) &&
+						((((szamani[i].y - 40) <= pos_y) && ((szamani[i].y + 40) >= pos_y))))
+					{
+						if (pomocnicza_do_straty_hp2 <50)
+						{
+							pomocnicza_do_straty_hp2++;
+							if (pomocnicza_do_straty_hp2 == 50)
+								pomocnicza_do_straty_hp2 = 0;
+							if (pomocnicza_do_straty_hp2 == 25)
+								pos_hp -= 25;
+						}
+					}
+				}
+			}
+			RuchPociskSzamana(ilosc_szamanow,szamani );
+
+			// kolizja pocisk_szamana-postac  - pociski szamana
+			
+				for (int j = 0; j < ilosc_szamanow; j++)
+				{
+					if (((((szamani[j].pociski_szamana.x - 20) <= pos_x) && ((szamani[j].pociski_szamana.x + 20) >= pos_x))) &&
+						((((szamani[j].pociski_szamana.y - 20) <= pos_y) && ((szamani[j].pociski_szamana.y + 20) >= pos_y))))
+
+						{
+							szamani[j].pociski_szamana.live = false;
+							szamani[j].pociski_szamana.x = -1000;
+							szamani[j].pociski_szamana.y = -1000;
+							pos_hp -= 10;
+						}
+				}
+				
 			// koniec gry
 			if (pos_hp <= 0)
 			{
+
+				
 				pomocnicza_do_konca_gry_przegrana++;
 				if (pomocnicza_do_konca_gry_przegrana == 10)
 				{
-					int przegrales = al_show_native_message_box
-					(
-						okno,
-						"OrcVille",
-						"Koniec gry - przegrales",
-						NULL, NULL, ALLEGRO_MESSAGEBOX_OK_CANCEL
-					);
-					if (przegrales == 1)
-						done = true;
+					score = score + czas * 5;
+					faza_gry = 5;
 				}
 			}
 
@@ -1140,54 +1606,73 @@ int main(void) {
 
 			if (level == 1)
 			{
-				if (doswiadczenie >= 50)
-				{
-					pos_hp = 100;
-					level++;
-					doswiadczenie -= 50;
-				}
-			}
-			if (level == 2)
-			{
-				level_up++;
 				if (doswiadczenie >= 100)
 				{
 					pos_hp = 100;
 					level++;
 					doswiadczenie -= 100;
+				}
+			}
+			if (level == 2)
+			{
+				level_up++;
+				score += 100;
+				if (doswiadczenie >= 200)
+				{
+					pos_hp = 100;
+					level++;
+					doswiadczenie -= 200;
 					level_up = 0;
 				}
 			}
 			if (level == 3)
 			{
 				level_up++;
-				if (doswiadczenie >= 150)
+				score += 500;
+				if (doswiadczenie >= 300)
 				{
 					pos_hp = 100;
 					level++;
-					doswiadczenie -= 150;
+					doswiadczenie -= 300;
 					level_up = 0;
 				}
 			}
 			if (level == 4)
 			{
-				RodzajPocisku = 3;
-				pomocnicza_do_konca_gry_wygrana++;
-				if (pomocnicza_do_konca_gry_wygrana == 10)
+				level_up++;
+				score += 1000;
+				if (doswiadczenie >= 400)
 				{
-					int wygrales = al_show_native_message_box
-					(
-						okno,
-						"OrcVille",
-						"Koniec gry- wygrales",
-						NULL, NULL, ALLEGRO_MESSAGEBOX_OK_CANCEL
-					);
-					if (wygrales == 1)
-						done = true;
+					pos_hp = 100;
+					level++;
+					doswiadczenie -= 400;
+					level_up = 0;
 				}
-
 			}
-
+			if (level == 5)
+			{
+				level_up++;
+				score += 1500;
+				if (doswiadczenie >= 500)
+				{
+					pos_hp = 100;
+					level++;
+					doswiadczenie -= 500;
+					level_up = 0;
+				}
+			}
+			if (level == 6)
+			{
+				level_up++;
+				score += 2000;
+				if (doswiadczenie >= 600)
+				{
+					pos_hp = 100;
+					level++;
+					doswiadczenie -= 600;
+					level_up = 0;
+				}
+			}
 
 			redraw = true;
 				// rysowanie mapy
@@ -1679,13 +2164,15 @@ int main(void) {
 			redraw = false;
 
 			DrawPocisk(pociski, ilosc_pociskow);
+			
 			DrawOrk(orkowie, ilosc_orkow, pomocnicza_do_sprite_orka);
-
+			DrawSzaman(szamani, ilosc_szamanow, pomocnicza_do_sprite_szamana);
+			DrawPociskSzamana(ilosc_szamanow,szamani);
 
 			// wyswietlanie level up
-			if ((level_up > 1) && (level_up < 300))
+			if ((level_up > 1) && (level_up < 150))
 			{
-				al_draw_bitmap(LevelUp, 425, 75, 0);
+				al_draw_bitmap(LevelUp, 455, 30, 0);
 			}
 
 			// wyswietlanie paremetrow postaci
@@ -1745,42 +2232,7 @@ int main(void) {
 				al_draw_bitmap(ZwojTrucizna, 245, 640, 0);
 				al_draw_textf(font24, al_map_rgb(255, 255, 255), 330, 650, ALLEGRO_ALIGN_RIGHT,
 					"%i", ilosc_trucizna);
-
 			}
-			/*
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 135, 60, ALLEGRO_ALIGN_RIGHT,
-			"Level: %i", level);*/
-			/*
-			// pozycja orka na mapie
-			float ork_x = orkowie[0].x - mapa_x;
-			float ork_y = orkowie[0].y - mapa_y;
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 300, 220, ALLEGRO_ALIGN_LEFT,
-			"X orka: %.0f", ork_x);
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 400, 250, ALLEGRO_ALIGN_RIGHT,
-			"Y orka: %.0f", ork_y);
-			*/
-			//pozycja postaci na mapie
-			/*
-			float x = pos_x - mapa_x;
-			float y = pos_y - mapa_y;
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 300, 20, ALLEGRO_ALIGN_LEFT,
-			"X postaci: %.0f", x);
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 400, 50, ALLEGRO_ALIGN_RIGHT,
-			"Y postaci: %.0f", y);
-			*/
-			// X i Y postaci
-			/*
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 500, 100, ALLEGRO_ALIGN_LEFT,
-			"X postaci: %i", ktoryX);
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 600, 150, ALLEGRO_ALIGN_RIGHT,
-			"Y postaci: %i", ktoryY);*/
-			/*
-			// pozycja mapy
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 500, 400, ALLEGRO_ALIGN_LEFT,
-			"X mapy: %.0f", mapa_x);
-			al_draw_textf(font24, al_map_rgb(255, 255, 255), 600, 450, ALLEGRO_ALIGN_RIGHT,
-			"Y mapy: %.0f", mapa_y);*/
-
 			al_flip_display();
 			al_clear_to_color(al_map_rgb(0, 0, 0));
 		}
@@ -2016,6 +2468,87 @@ int main(void) {
 				al_clear_to_color(al_map_rgb(0, 0, 0));
 			}
 		}
+	if (faza_gry == 5)
+		{
+			ALLEGRO_EVENT ev5;
+			al_wait_for_event(event_queue, &ev5);
+			if (ev5.type == ALLEGRO_EVENT_KEY_UP)
+			{
+				switch (ev5.keyboard.keycode)
+				{
+				case ALLEGRO_KEY_ESCAPE:
+				{
+					int wyjsc_z_gry = al_show_native_message_box
+					(
+						okno,
+						"OrcVille",
+						"Wyjsc z gry??",
+						NULL, NULL, ALLEGRO_MESSAGEBOX_YES_NO
+					);
+					if (wyjsc_z_gry == 1)
+						done = true;
+
+				}
+				}
+			}
+			else if (ev5.type == ALLEGRO_EVENT_MOUSE_BUTTON_DOWN)
+			{
+				kursor_x5 = ev5.mouse.x;
+				kursor_y5 = ev5.mouse.y;
+			}
+			else if (ev5.type == ALLEGRO_EVENT_DISPLAY_CLOSE)
+			{
+				int wyjsc_z_gry = al_show_native_message_box
+				(
+					okno,
+					"OrcVille",
+					"Wyjsc z gry??",
+					NULL, NULL, ALLEGRO_MESSAGEBOX_YES_NO
+				);
+				if (wyjsc_z_gry == 1)
+					done = true;
+
+			}
+			else if (ev5.type == ALLEGRO_EVENT_TIMER)
+			{
+				if (kursor_x5 > 384 && kursor_x5 < 863 && kursor_y5 > 350 && kursor_y5 < 498)
+				{
+					kursor_x5 = -100;
+					kursor_y5 = -100;
+					int wyjsc_z_gry = al_show_native_message_box
+					(
+						okno,
+						"OrcVille",
+						"Wyjsc z gry??",
+						NULL, NULL, ALLEGRO_MESSAGEBOX_YES_NO
+					);
+					if (wyjsc_z_gry == 1)
+						done = true;
+
+				}
+
+				redraw = true;
+			}
+			if (redraw && al_is_event_queue_empty(event_queue))
+			{
+				redraw = false;
+				al_draw_bitmap(Wynik, 0, 0, 0);
+				if (redraw == false)
+				{
+					if (score < 100)
+						al_draw_textf(font24, al_map_rgb(255, 255, 255), 620, 206, ALLEGRO_ALIGN_RIGHT,
+							"%.0f", score);
+					if (score < 1000 && score >= 100)
+						al_draw_textf(font24, al_map_rgb(255, 255, 255), 630, 206, ALLEGRO_ALIGN_RIGHT,
+							"%.0f", score);
+					if (score >=1000)
+						al_draw_textf(font24, al_map_rgb(255, 255, 255), 640, 206, ALLEGRO_ALIGN_RIGHT,
+							"%.0f", score);
+				}
+			}
+				al_flip_display();
+			}
+		
 	}
 
 	al_destroy_event_queue(event_queue);
@@ -2216,7 +2749,7 @@ void RuchPostaciD(float & pos_x, float pos_y, int ktoryX, int ktoryY, float pred
 void RuchOrkaW(float pos_x, float & pos_y, int ktoryX, int ktoryY, float predkosc_postaci)
 {
 	float gdzie_bedeY = pos_y - predkosc_postaci;
-	bool obszar_mapy = ((gdzie_bedeY) >0) ? 1 : 0;
+	bool obszar_mapy = true;
 
 	if ((czy_mozna_wejsc[ktoryX][ktoryY] == false) && (czy_mozna_wejsc[ktoryX + 1][ktoryY] == false) && (obszar_mapy == true))
 	{
@@ -2257,7 +2790,7 @@ void RuchOrkaS(float pos_x, float & pos_y, int ktoryX, int ktoryY, float predkos
 {
 
 	float gdzie_bedeY = pos_y + predkosc_postaci;
-	bool obszar_mapy = ((gdzie_bedeY) < (1500 - 50 + 1)) ? 1 : 0;
+	bool obszar_mapy = true;
 
 	if ((czy_mozna_wejsc[ktoryX][ktoryY + 1] == false) && (czy_mozna_wejsc[ktoryX + 1][ktoryY + 1] == false) && (obszar_mapy == true))
 	{
@@ -2298,7 +2831,7 @@ void RuchOrkaA(float & pos_x, float pos_y, int ktoryX, int ktoryY, float predkos
 {
 
 	float gdzie_bedeY = pos_x - predkosc_postaci;
-	bool obszar_mapy = ((gdzie_bedeY) > 0) ? 1 : 0;
+	bool obszar_mapy = true;
 
 	if ((czy_mozna_wejsc[ktoryX][ktoryY] == false) && (czy_mozna_wejsc[ktoryX][ktoryY + 1] == false) && (obszar_mapy == true))
 	{
@@ -2336,7 +2869,7 @@ void RuchOrkaA(float & pos_x, float pos_y, int ktoryX, int ktoryY, float predkos
 void RuchOrkaD(float & pos_x, float pos_y, int ktoryX, int ktoryY, float predkosc_postaci)
 {
 	float gdzie_bedeY = pos_x + predkosc_postaci;
-	bool obszar_mapy = ((gdzie_bedeY) < (1500 - 50 + 1)) ? 1 : 0;
+	bool obszar_mapy = true;
 
 	if ((czy_mozna_wejsc[ktoryX + 1][ktoryY] == false) && (czy_mozna_wejsc[ktoryX + 1][ktoryY + 1] == false) && (obszar_mapy == true))
 	{
@@ -2384,7 +2917,8 @@ void InitOrk(Ork orkowie[], int ile)
 		orkowie[i].ktoryX_ork;
 		orkowie[i].ktoryY_ork;
 		orkowie[i].hp = 100;
-		orkowie[i].efekt_pocisku = false;
+		orkowie[i].efekt_pocisku_sopel =false;
+		orkowie[i].efekt_pocisku_trucizna=false;
 		orkowie[i].pomocnicza_do_efektu = 0;
 		orkowie[i].efekt_krwi = false;
 		orkowie[i].pomocnicza_do_krwi = 0;
@@ -2751,46 +3285,91 @@ void StartOrk(Ork orkowie[], int ile)
 			if (!orkowie[i].live)
 			{
 
-				if (rand() % 750 == 0)
+				if (rand() % losowanie_orka == 0)
 				{
 					if (orkowie[i].a == 0)
 					{
 						orkowie[i].live = true;
-						orkowie[i].x = 800;
-						orkowie[i].y = 25;
+						if (mapa_x < 0)
+						{
+							orkowie[i].x = ((rand() % 3+2)*50) +mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							orkowie[i].x = ((rand() % 3 + 2) * 50);
+						}
+						if (mapa_y < 0)
+						{
+							orkowie[i].y = ((rand() % 2 + 3)*50) + mapa_y;
+						}
+						if (mapa_y == 0)
+						{
+							orkowie[i].y = ((rand() % 2 + 3) * 50);
+						}
 						KtoryXY(orkowie[i].x, orkowie[i].y, mapa_x, mapa_y, orkowie[i].ktoryX_ork, orkowie[i].ktoryY_ork);
-
-						/*
-						orkowie[i].x = ((rand() % 3 + 23) * 50);
-						orkowie[i].y = ((rand() % 3 + 8) * 50)*(-1);
-						std::cout << "Ork X" << orkowie[i].x << std::endl;
-						std::cout << "Ork Y" << orkowie[i].y << std::endl;
-						KtoryXY(orkowie[i].x, orkowie[i].y, mapa_x, mapa_y, orkowie[i].ktoryX_ork, orkowie[i].ktoryY_ork);
-						//if (czy_mozna_wejsc[orkowie[i].ktoryX_ork][orkowie[i].ktoryY_ork]==true)
-						//break;
-						std::cout << "Ork KtoryX" << orkowie[i].ktoryX_ork << std::endl;
-						std::cout << "Ork KtoryY" << orkowie[i].ktoryY_ork << std::endl;
-						*/
+						
 					}
 					else if (orkowie[i].a == 1)
 					{
-						orkowie[i].live = true;
-						orkowie[i].x = 200;  // 1200
-						orkowie[i].y = 25;   // 150
+							orkowie[i].live = true;
+						if (mapa_x<0)
+						{
+							orkowie[i].x = ((rand() % 3 + 23) * 50) + mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							orkowie[i].x = ((rand() % 3 + 23) * 50);
+						}
+						if (mapa_y < 0)
+						{
+							orkowie[i].y = ((rand() % 2 + 3) * 50) + mapa_y;
+						}
+						if (mapa_y == 0)
+						{
+							orkowie[i].y = ((rand() % 2 + 3) * 50);
+						}
 						KtoryXY(orkowie[i].x, orkowie[i].y, mapa_x, mapa_y, orkowie[i].ktoryX_ork, orkowie[i].ktoryY_ork);
 					}
 					else if (orkowie[i].a == 2)
 					{
 						orkowie[i].live = true;
-						orkowie[i].x = 800;
-						orkowie[i].y = 625;
+						if (mapa_x < 0)
+						{
+							orkowie[i].x = ((rand() % 3 + 3) * 50) + mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							orkowie[i].x = ((rand() % 3 + 3) * 50);
+						}
+						if (mapa_y > -800)
+						{
+							orkowie[i].y = ((rand() % 2 + 23) * 50) + mapa_y;
+						}
+						if (mapa_y == -800)
+						{
+							orkowie[i].y = ((rand() % 2 + 8) * 50);
+						}
 						KtoryXY(orkowie[i].x, orkowie[i].y, mapa_x, mapa_y, orkowie[i].ktoryX_ork, orkowie[i].ktoryY_ork);
 					}
 					else if (orkowie[i].a == 3)
 					{
 						orkowie[i].live = true;
-						orkowie[i].x = 200;
-						orkowie[i].y = 625;
+						if (mapa_x > -250)
+						{
+							orkowie[i].x = ((rand() % 3 + 26) * 50) + mapa_x;
+						}
+						if (mapa_x == -250)
+						{
+							orkowie[i].x = ((rand() % 3 + 18) * 50);
+						}
+						if (mapa_y > -800)
+						{
+							orkowie[i].y = ((rand() % 2 + 24) * 50) + mapa_y;
+						}
+						if (mapa_y == -800)
+						{
+							orkowie[i].y = ((rand() % 2 + 9) * 50);
+						}
 						KtoryXY(orkowie[i].x, orkowie[i].y, mapa_x, mapa_y, orkowie[i].ktoryX_ork, orkowie[i].ktoryY_ork);
 					}
 					break;
@@ -3106,19 +3685,27 @@ void StartPocisk(Pocisk pociski[], int ile, float pos_x, float pos_y)
 			if (RodzajPocisku == 1)
 			{
 				pociski[i].rodzaj_pocisku = 1;
+				ilosc_fireball -= 1;
 			}
 			else if (RodzajPocisku == 2)
 			{
 				pociski[i].rodzaj_pocisku = 2;
+				ilosc_sopel -= 1;
 			}
 			else if (RodzajPocisku == 3)
 			{
 				pociski[i].rodzaj_pocisku = 3;
+				ilosc_trucizna -= 1;
 			}
 			else
 			{
 				pociski[i].rodzaj_pocisku = 1;
 			}
+
+			
+			
+			
+
 
 			// w lewo gore
 			if (kursor_y <= pos_y + 24 && kursor_x <= pos_x + 24)
@@ -3295,6 +3882,829 @@ void RuchPocisk(Pocisk pociski[], int ile)
 	}
 }
 
+void InitSzaman(Szaman szamani[], int ile)
+{
+	for (int i = 0; i < ile; i++)
+	{
+		szamani[i].ID = SZAMAN;
+		szamani[i].live = false;
+		szamani[i].predkosc = 1;
+		szamani[i].boundx = 50;
+		szamani[i].boundy = 50;
+		szamani[i].a = rand() % 4;
+		szamani[i].ktoryX_szaman;
+		szamani[i].ktoryY_szaman;
+		szamani[i].hp = 120;
+		szamani[i].efekt_pocisku_sopel = false;
+		szamani[i].efekt_pocisku_trucizna = false;
+		szamani[i].pomocnicza_do_efektu = 0;
+		szamani[i].efekt_krwi = false;
+		szamani[i].pomocnicza_do_krwi = 0;
+		szamani[i].PozycjaSzamana = 3;
+		szamani[i].pomocnicza_do_strzalu_szamana = 0;
+
+		
+		szamani[i].SzamanSprite[0] = al_load_bitmap("Szaman/szaman w dol.png");
+		szamani[i].SzamanSprite[1] = al_load_bitmap("Szaman/szaman w dol 1.png");
+		szamani[i].SzamanSprite[2] = al_load_bitmap("Szaman/szaman w dol 2.png");
+		szamani[i].SzamanSprite[3] = al_load_bitmap("Szaman/szaman w dol.png");
+		szamani[i].SzamanSprite[4] = al_load_bitmap("Szaman/szaman w dol 3.png");
+		szamani[i].SzamanSprite[5] = al_load_bitmap("Szaman/szaman w dol 4.png");
+
+		szamani[i].SzamanSprite[6] = al_load_bitmap("Szaman/szaman w gore.png");
+		szamani[i].SzamanSprite[7] = al_load_bitmap("Szaman/szaman w gore 1.png");
+		szamani[i].SzamanSprite[8] = al_load_bitmap("Szaman/szaman w gore 2.png");
+		szamani[i].SzamanSprite[9] = al_load_bitmap("Szaman/szaman w gore.png");
+		szamani[i].SzamanSprite[10] = al_load_bitmap("Szaman/szaman w gore 3.png");
+		szamani[i].SzamanSprite[11] = al_load_bitmap("Szaman/szaman w gore 4.png");
+
+		szamani[i].SzamanSprite[12] = al_load_bitmap("Szaman/szaman w prawo.png");
+		szamani[i].SzamanSprite[13] = al_load_bitmap("Szaman/szaman w prawo 1.png");
+		szamani[i].SzamanSprite[14] = al_load_bitmap("Szaman/szaman w prawo 2.png");
+		szamani[i].SzamanSprite[15] = al_load_bitmap("Szaman/szaman w prawo.png");
+		szamani[i].SzamanSprite[16] = al_load_bitmap("Szaman/szaman w prawo 3.png");
+		szamani[i].SzamanSprite[17] = al_load_bitmap("Szaman/szaman w prawo 4.png");
+
+		szamani[i].SzamanSprite[18] = al_load_bitmap("Szaman/szaman w lewo.png");
+		szamani[i].SzamanSprite[19] = al_load_bitmap("Szaman/szaman w lewo 1.png");
+		szamani[i].SzamanSprite[20] = al_load_bitmap("Szaman/szaman w lewo 2.png");
+		szamani[i].SzamanSprite[21] = al_load_bitmap("Szaman/szaman w lewo.png");
+		szamani[i].SzamanSprite[22] = al_load_bitmap("Szaman/szaman w lewo 3.png");
+		szamani[i].SzamanSprite[23] = al_load_bitmap("Szaman/szaman w lewo 4.png");
+
+		szamani[i].SzamanSprite[24] = al_load_bitmap("Szaman/szaman w dol prawo.png");
+		szamani[i].SzamanSprite[25] = al_load_bitmap("Szaman/szaman w dol prawo 1.png");
+		szamani[i].SzamanSprite[26] = al_load_bitmap("Szaman/szaman w dol prawo 2.png");
+		szamani[i].SzamanSprite[27] = al_load_bitmap("Szaman/szaman w dol prawo.png");
+		szamani[i].SzamanSprite[28] = al_load_bitmap("Szaman/szaman w dol prawo 3.png");
+		szamani[i].SzamanSprite[29] = al_load_bitmap("Szaman/szaman w dol prawo 4.png");
+
+		szamani[i].SzamanSprite[30] = al_load_bitmap("Szaman/szaman w dol lewo.png");
+		szamani[i].SzamanSprite[31] = al_load_bitmap("Szaman/szaman w dol lewo 1.png");
+		szamani[i].SzamanSprite[32] = al_load_bitmap("Szaman/szaman w dol lewo 2.png");
+		szamani[i].SzamanSprite[33] = al_load_bitmap("Szaman/szaman w dol lewo.png");
+		szamani[i].SzamanSprite[34] = al_load_bitmap("Szaman/szaman w dol lewo 3.png");
+		szamani[i].SzamanSprite[35] = al_load_bitmap("Szaman/szaman w dol lewo 4.png");
+
+		szamani[i].SzamanSprite[36] = al_load_bitmap("Szaman/szaman w gore prawo.png");
+		szamani[i].SzamanSprite[37] = al_load_bitmap("Szaman/szaman w gore prawo 1.png");
+		szamani[i].SzamanSprite[38] = al_load_bitmap("Szaman/szaman w gore prawo 2.png");
+		szamani[i].SzamanSprite[39] = al_load_bitmap("Szaman/szaman w gore prawo.png");
+		szamani[i].SzamanSprite[40] = al_load_bitmap("Szaman/szaman w gore prawo 3.png");
+		szamani[i].SzamanSprite[41] = al_load_bitmap("Szaman/szaman w gore prawo 4.png");
+
+		szamani[i].SzamanSprite[42] = al_load_bitmap("Szaman/szaman w gore lewo.png");
+		szamani[i].SzamanSprite[43] = al_load_bitmap("Szaman/szaman w gore lewo 1.png");
+		szamani[i].SzamanSprite[44] = al_load_bitmap("Szaman/szaman w gore lewo 2.png");
+		szamani[i].SzamanSprite[45] = al_load_bitmap("Szaman/szaman w gore lewo.png");
+		szamani[i].SzamanSprite[46] = al_load_bitmap("Szaman/szaman w gore lewo 3.png");
+		szamani[i].SzamanSprite[47] = al_load_bitmap("Szaman/szaman w gore lewo 4.png");
+
+		szamani[i].SzamanSprite[48] = al_load_bitmap("Krew/Krew1.png");
+		szamani[i].SzamanSprite[49] = al_load_bitmap("Krew/Krew2.png");
+		szamani[i].SzamanSprite[50] = al_load_bitmap("Krew/Krew3.png");
+
+	}
+}
+void DrawSzaman(Szaman szamani[], int ile, int pomocnicza_do_sprite_szamana)
+{
+
+	for (int i = 0; i < ile; i++)
+	{
+		if (szamani[i].live)
+		{
+			//sprite Szamanow
+			if (szamani[i].PozycjaSzamana == 4)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[6], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[7], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[8], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[9], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[10], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[11], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 3)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[0], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[1], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[2], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[3], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[4], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[5], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 1)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[12], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[13], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[14], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[15], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[16], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[17], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 2)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[18], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[19], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[20], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[21], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[22], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[23], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 8)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[24], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[25], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[26], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[27], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[28], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[29], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 6)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[30], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[31], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[32], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[33], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[34], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[35], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 7)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[36], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[37], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[38], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[39], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[40], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[41], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+			if (szamani[i].PozycjaSzamana == 5)
+			{
+				if (pomocnicza_do_sprite_szamana == 0)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[42], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 0 && pomocnicza_do_sprite_szamana <= 10)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[43], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 10 && pomocnicza_do_sprite_szamana <= 20)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[44], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 20 && pomocnicza_do_sprite_szamana <= 30)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[45], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 30 && pomocnicza_do_sprite_szamana <= 40)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[46], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana > 40 && pomocnicza_do_sprite_szamana <= 50)
+				{
+					al_draw_bitmap(szamani[i].SzamanSprite[47], szamani[i].x, szamani[i].y, 0);
+				}
+				if (pomocnicza_do_sprite_szamana == 50)
+				{
+					pomocnicza_do_sprite_szamana = 0;
+				}
+			}
+
+		}
+		if (szamani[i].efekt_krwi == true)
+		{
+			if (szamani[i].pomocnicza_do_krwi <= 30 && faza_gry == 2)
+			{
+				szamani[i].pomocnicza_do_krwi++;
+			}
+			if (szamani[i].pomocnicza_do_krwi == 30)
+			{
+				szamani[i].efekt_krwi = false;
+				szamani[i].pomocnicza_do_krwi = 0;
+			}
+			if (szamani[i].pomocnicza_do_krwi >= 1 && szamani[i].pomocnicza_do_krwi <= 10)
+			{
+				al_draw_bitmap(szamani[i].SzamanSprite[48], szamani[i].x, szamani[i].y, 0);
+			}
+			if (szamani[i].pomocnicza_do_krwi > 10 && szamani[i].pomocnicza_do_krwi <= 20)
+			{
+				al_draw_bitmap(szamani[i].SzamanSprite[49], szamani[i].x, szamani[i].y, 0);
+			}
+			if (szamani[i].pomocnicza_do_krwi > 20 && szamani[i].pomocnicza_do_krwi <= 29)
+			{
+				al_draw_bitmap(szamani[i].SzamanSprite[50], szamani[i].x, szamani[i].y, 0);
+			}
+		}
+
+	}
+}
+void StartSzaman(Szaman szamani[], int ile)
+{
+	for (int i = 0; i < ile; i++)
+	{
+		//zeby nie zrespil sie zanim animacja krwi sie skonczy
+		if (szamani[i].pomocnicza_do_krwi == 0)
+		{
+			if (!szamani[i].live)
+			{
+				if (rand() % losowanie_szamana == 0)
+				{
+					if (szamani[i].a == 0)
+					{
+						szamani[i].live = true;
+						if (mapa_x < 0)
+						{
+							szamani[i].x = ((rand() % 3 + 2) * 50) + mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							szamani[i].x = ((rand() % 3 + 2) * 50);
+						}
+						if (mapa_y < 0)
+						{
+							szamani[i].y = ((rand() % 2 + 3) * 50) + mapa_y;
+						}
+						if (mapa_y == 0)
+						{
+							szamani[i].y = ((rand() % 2 + 3) * 50);
+						}
+						KtoryXY(szamani[i].x, szamani[i].y, mapa_x, mapa_y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman);
+					}
+					else if (szamani[i].a == 1)
+					{
+						szamani[i].live = true;
+						if (mapa_x<0)
+						{
+							szamani[i].x = ((rand() % 3 + 23) * 50) + mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							szamani[i].x = ((rand() % 3 + 23) * 50);
+						}
+						if (mapa_y < 0)
+						{
+							szamani[i].y = ((rand() % 2 + 3) * 50) + mapa_y;
+						}
+						if (mapa_y == 0)
+						{
+							szamani[i].y = ((rand() % 2 + 3) * 50);
+						}
+						KtoryXY(szamani[i].x, szamani[i].y, mapa_x, mapa_y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman);
+					}
+					else if (szamani[i].a == 2)
+					{
+						szamani[i].live = true;
+						if (mapa_x < 0)
+						{
+							szamani[i].x = ((rand() % 3 + 3) * 50) + mapa_x;
+						}
+						if (mapa_x == 0)
+						{
+							szamani[i].x = ((rand() % 3 + 3) * 50);
+						}
+						if (mapa_y > -800)
+						{
+							szamani[i].y = ((rand() % 2 + 23) * 50) + mapa_y;
+						}
+						if (mapa_y == -800)
+						{
+							szamani[i].y = ((rand() % 2 + 8) * 50);
+						}
+						KtoryXY(szamani[i].x, szamani[i].y, mapa_x, mapa_y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman);
+					}
+					else if (szamani[i].a == 3)
+					{
+						szamani[i].live = true;
+						if (mapa_x > -250)
+						{
+							szamani[i].x = ((rand() % 3 + 26) * 50) + mapa_x;
+						}
+						if (mapa_x == -250)
+						{
+							szamani[i].x = ((rand() % 3 + 18) * 50);
+						}
+						if (mapa_y > -800)
+						{
+							szamani[i].y = ((rand() % 2 + 24) * 50) + mapa_y;
+						}
+						if (mapa_y == -800)
+						{
+							szamani[i].y = ((rand() % 2 + 9) * 50);
+						}
+						KtoryXY(szamani[i].x, szamani[i].y, mapa_x, mapa_y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman);
+					}
+				}
 
 
+				break;
+			}
+		}
+	}
+}
+void RuchSzaman(Szaman szamani[], int ile)
+{
+	for (int i = 0; i < ile; i++)
+	{
+		if (szamani[i].live)
+		{
+			//  w prawo dol
+			if (szamani[i].y + 24 <= pos_y + 24 && szamani[i].x + 24 <= pos_x + 24)
+			{
+				szamani[i].kierunek = 1;
+			}// w prawo gore
+			else if (szamani[i].y + 24 >= pos_y + 24 && szamani[i].x + 24 <= pos_x + 24)
+			{
+				szamani[i].kierunek = 2;
+			}
+			//w lewo dol
+			else if (szamani[i].y + 24 <= pos_y + 24 && szamani[i].x + 24 >= pos_x + 24)
+			{
+				szamani[i].kierunek = 3;
+			}
+			// w lewo gora
+			else if (szamani[i].y + 24 >= pos_y + 24 && szamani[i].x + 24 >= pos_x + 24)
+			{
+				szamani[i].kierunek = 4;
+			}
+			
+			
+			SciezkaSzamana(pos_x, pos_y, szamani[i].x, szamani[i].y, szamani[i].predkosc, i, szamani[i].PozycjaSzamana);
+			KtoryXY(szamani[i].x, szamani[i].y, mapa_x, mapa_y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman);
 
+			szamani[i].odleglosc_x = sqrtf(pow(((szamani[i].x + 24 - mapa_x) - (pos_x + 24 - mapa_x)), 2));
+			szamani[i].odleglosc_y = sqrtf(pow(((szamani[i].y + 24 - mapa_y) - (pos_y + 24 - mapa_y)), 2));
+			szamani[i].odleglosc_xy = sqrtf(pow(szamani[i].odleglosc_x, 2) + pow(szamani[i].odleglosc_y, 2));
+			szamani[i].sinus = szamani[i].odleglosc_y / szamani[i].odleglosc_xy;
+			szamani[i].cosinus = szamani[i].odleglosc_x / szamani[i].odleglosc_xy;
+			RuchOrkaW(szamani[i].x, szamani[i].y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman, szamani[i].predkosc);
+			RuchOrkaS(szamani[i].x, szamani[i].y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman, szamani[i].predkosc);
+			RuchOrkaA(szamani[i].x, szamani[i].y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman, szamani[i].predkosc);
+			RuchOrkaD(szamani[i].x, szamani[i].y, szamani[i].ktoryX_szaman, szamani[i].ktoryY_szaman, szamani[i].predkosc);
+
+		}
+	}
+}
+void SciezkaSzamana(float pos_x, float pos_y, float &  przeciwnik_x, float & przeciwnik_y, float predkosc_szamana,int ile, int & PozycjaSzamana)
+{
+			//  w prawo
+			if (przeciwnik_x < pos_x && przeciwnik_y == pos_y)
+			{
+				przeciwnik_x += predkosc_szamana;
+				PozycjaSzamana = 1;
+			}// w lewo
+			else if (przeciwnik_x > pos_x && przeciwnik_y == pos_y)
+			{
+				przeciwnik_x -= predkosc_szamana;
+				PozycjaSzamana = 2;
+			}// do dolu
+			else if (przeciwnik_y < pos_y && przeciwnik_x == pos_x)
+			{
+				przeciwnik_y += predkosc_szamana;
+				PozycjaSzamana = 3;
+			}// do gory
+			else if (przeciwnik_y > pos_y && przeciwnik_x == pos_x)
+			{
+				przeciwnik_y -= predkosc_szamana;
+				PozycjaSzamana = 4;
+			}// w lewo gore
+			else if (przeciwnik_y > pos_y && przeciwnik_x > pos_x)
+			{
+				PozycjaSzamana = 5;
+				przeciwnik_x -= predkosc_szamana;
+				przeciwnik_y -= predkosc_szamana;
+				
+			}// w lewo dol
+			else if (przeciwnik_y < pos_y && przeciwnik_x > pos_x)
+			{
+				PozycjaSzamana = 6;
+				przeciwnik_x -= predkosc_szamana;
+				przeciwnik_y += predkosc_szamana;
+				
+			}//w prawo gore
+			else if (przeciwnik_y > pos_y && przeciwnik_x < pos_x)
+			{
+				PozycjaSzamana = 7;
+				przeciwnik_x += predkosc_szamana;
+				przeciwnik_y -= predkosc_szamana;
+				
+			}// w prawo dol
+			else if (przeciwnik_y < pos_y && przeciwnik_x < pos_x)
+			{
+				PozycjaSzamana = 8;
+				przeciwnik_x += predkosc_szamana;
+				przeciwnik_y += predkosc_szamana;
+				
+			}
+			else if (przeciwnik_x == pos_x && przeciwnik_y == pos_y)
+			{
+				PozycjaSzamana = 3;
+			}
+}
+
+
+void InitPociskSzamana( int ile, Szaman szamani[])
+{
+	for (int i = 0; i < ile; i++)
+	{
+		szamani[i].pociski_szamana.ID = POCISKSZAMANA;
+		szamani[i].pociski_szamana.live = false;
+		szamani[i].pociski_szamana.predkosc = 6.0;
+		szamani[i].pociski_szamana.ktoryX_pocisk_szamana;
+		szamani[i].pociski_szamana.ktoryY_pocisk_szamana;
+		szamani[i].pociski_szamana.czy_moze_strzelic_szaman = true;
+
+		szamani[i].pociski_szamana.pocisk_szamana[0] = al_load_bitmap("PociskSzamana/Pocisk szamana w dol.png");
+		szamani[i].pociski_szamana.pocisk_szamana[1] = al_load_bitmap("PociskSzamana/Pocisk szamana w gore.png");
+		szamani[i].pociski_szamana.pocisk_szamana[2] = al_load_bitmap("PociskSzamana/Pocisk szamana w prawo.png");
+		szamani[i].pociski_szamana.pocisk_szamana[3] = al_load_bitmap("PociskSzamana/Pocisk szamana w lewo.png");
+
+		szamani[i].pociski_szamana.pocisk_szamana[4] = al_load_bitmap("PociskSzamana/Pocisk szamana w lewo dol 1.png");
+		szamani[i].pociski_szamana.pocisk_szamana[5] = al_load_bitmap("PociskSzamana/Pocisk szamana w lewo dol 2.png");
+
+		szamani[i].pociski_szamana.pocisk_szamana[6] = al_load_bitmap("PociskSzamana/Pocisk szamana w prawo dol 1.png");
+		szamani[i].pociski_szamana.pocisk_szamana[7] = al_load_bitmap("PociskSzamana/Pocisk szamana w prawo dol 2.png");
+
+		szamani[i].pociski_szamana.pocisk_szamana[8] = al_load_bitmap("PociskSzamana/Pocisk szamana w lewo gore 1.png");
+		szamani[i].pociski_szamana.pocisk_szamana[9] = al_load_bitmap("PociskSzamana/Pocisk szamana w lewo gore 2.png");
+
+		szamani[i].pociski_szamana.pocisk_szamana[10] = al_load_bitmap("PociskSzamana/Pocisk szamana w prawo gore 1.png");
+		szamani[i].pociski_szamana.pocisk_szamana[11] = al_load_bitmap("PociskSzamana/Pocisk szamana w prawo gore 2.png");
+	}
+}
+void DrawPociskSzamana(int ile, Szaman szamani[])
+{
+		for (int i = 0; i < ile; i++)
+		{
+			if (szamani[i].pociski_szamana.live==true)
+			{
+				// w lewo gore
+				if (szamani[i].pociski_szamana.kierunek == 4)
+				{
+
+					if (szamani[i].pociski_szamana.sinus >= 0 && szamani[i].pociski_szamana.sinus <= 0.1736)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[3], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus >= 0.9848 && szamani[i].pociski_szamana.sinus <= 1)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[1], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.1736 && szamani[i].pociski_szamana.sinus <= 0.7071)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[8], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.7071 && szamani[i].pociski_szamana.sinus < 0.9848)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[9], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+				}
+				// w lewo dol
+				if (szamani[i].pociski_szamana.kierunek == 3)
+				{
+					if (szamani[i].pociski_szamana.sinus >= 0 && szamani[i].pociski_szamana.sinus <= 0.1736)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[3], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus >= 0.9848 && szamani[i].pociski_szamana.sinus <= 1)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[0], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.7071 && szamani[i].pociski_szamana.sinus <= 0.9848)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[4], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.1736 && szamani[i].pociski_szamana.sinus < 0.7071)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[5], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+				}
+				//w prawo gore
+				if (szamani[i].pociski_szamana.kierunek == 2)
+				{
+					if (szamani[i].pociski_szamana.sinus >= 0 && szamani[i].pociski_szamana.sinus <= 0.1736)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[2], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus >= 0.9848 && szamani[i].pociski_szamana.sinus <= 1)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[1], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus >= 0.7071 && szamani[i].pociski_szamana.sinus < 0.9848)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[10], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.1736 && szamani[i].pociski_szamana.sinus < 0.7071)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[11], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+				}
+				// w prawo dol
+				if (szamani[i].pociski_szamana.kierunek == 1)
+				{
+					if (szamani[i].pociski_szamana.sinus >= 0 && szamani[i].pociski_szamana.sinus <= 0.1736)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[2], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus >= 0.9848 && szamani[i].pociski_szamana.sinus <= 1)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[0], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.1736 && szamani[i].pociski_szamana.sinus <= 0.7071)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[6], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+					if (szamani[i].pociski_szamana.sinus > 0.7071 && szamani[i].pociski_szamana.sinus < 0.9848)
+						al_draw_bitmap(szamani[i].pociski_szamana.pocisk_szamana[7], szamani[i].pociski_szamana.x, szamani[i].pociski_szamana.y, 0);
+				}
+			}
+		}
+	
+}
+void StartPociskSzamana(int ile, Szaman szamani[])
+{
+		for (int i = 0; i < ile; i++)
+		{
+			if (szamani[i].pociski_szamana.live == false)
+			{
+				
+				szamani[i].pociski_szamana.kierunek = szamani[i].kierunek;
+				szamani[i].pociski_szamana.live = true;
+				szamani[i].pociski_szamana.x = szamani[i].x + 1;
+				szamani[i].pociski_szamana.y = szamani[i].y + 1;
+				szamani[i].pociski_szamana.odleglosc_x = sqrtf(pow(((szamani[i].pociski_szamana.x - mapa_x) - (pos_x - mapa_x)), 2));
+				szamani[i].pociski_szamana.odleglosc_y = sqrtf(pow(((szamani[i].pociski_szamana.y - mapa_y) - (pos_y  - mapa_y)), 2));
+				szamani[i].pociski_szamana.odleglosc_xy = sqrtf(pow(szamani[i].pociski_szamana.odleglosc_x, 2) + pow(szamani[i].pociski_szamana.odleglosc_y, 2));
+				szamani[i].pociski_szamana.sinus = szamani[i].pociski_szamana.odleglosc_y / szamani[i].pociski_szamana.odleglosc_xy;
+				szamani[i].pociski_szamana.cosinus = szamani[i].pociski_szamana.odleglosc_x / szamani[i].pociski_szamana.odleglosc_xy;
+			
+			}
+		}
+}
+void RuchPociskSzamana(int ile, Szaman szamani[])
+{
+		for (int i = 0; i < ile; i++)
+		{
+			if (szamani[i].pociski_szamana.live==true)
+			{
+				if (szamani[i].pociski_szamana.x > szerokosc)
+					szamani[i].pociski_szamana.live = false;
+				if (szamani[i].pociski_szamana.x < 0)
+					szamani[i].pociski_szamana.live = false;
+				if (szamani[i].pociski_szamana.y > wysokosc)
+					szamani[i].pociski_szamana.live = false;
+				if (szamani[i].pociski_szamana.y < 0)
+					szamani[i].pociski_szamana.live = false;
+					
+				KtoryXY(szamani[i].pociski_szamana.x + 10, szamani[i].pociski_szamana.y + 10, mapa_x, mapa_y, szamani[i].pociski_szamana.ktoryX_pocisk_szamana, szamani[i].pociski_szamana.ktoryY_pocisk_szamana);
+				
+				// kolizja przeszkody
+				if (szamani[i].pociski_szamana.live==true)
+				{
+					// W
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false) && (czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false))
+					{
+						if ((szamani[i].pociski_szamana.x >= (szamani[i].pociski_szamana.ktoryX_pocisk_szamana * 50)) && (szamani[i].pociski_szamana.x <= ((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 2) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false))
+					{
+						if (szamani[i].pociski_szamana.x < (((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false))
+					{
+						if ((szamani[i].pociski_szamana.x + 50 >(((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1) * 50))))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					// S
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false) && (czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.y >= (szamani[i].pociski_szamana.ktoryY_pocisk_szamana * 50)) && (szamani[i].pociski_szamana.y <= ((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 2) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false))
+					{
+						if (szamani[i].pociski_szamana.y < (((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.y + 50) >(((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					// A
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false) && (czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.x >= (szamani[i].pociski_szamana.ktoryX_pocisk_szamana * 50)) && (szamani[i].pociski_szamana.x <= ((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 2) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if (szamani[i].pociski_szamana.x < (((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					else if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.x + 50) >(((szamani[i].pociski_szamana.ktoryX_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					// D
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false) && (czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.y >= (szamani[i].pociski_szamana.ktoryY_pocisk_szamana * 50)) && (szamani[i].pociski_szamana.y <= ((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 2) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana] == false))
+					{
+						if (szamani[i].pociski_szamana.y < (((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+
+					}
+					if ((czy_mozna_wejsc[szamani[i].pociski_szamana.ktoryX_pocisk_szamana][szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1] == false))
+					{
+						if ((szamani[i].pociski_szamana.y + 50) >(((szamani[i].pociski_szamana.ktoryY_pocisk_szamana + 1) * 50)))
+						{
+							szamani[i].pociski_szamana.live = false;
+						}
+					}
+				}
+				
+
+				// strzelanie w 360 stopniach
+				if (szamani[i].pociski_szamana.live==true)
+				{
+
+					// w lewo gore
+					if (szamani[i].pociski_szamana.kierunek == 4)
+					{
+						szamani[i].pociski_szamana.x -= szamani[i].pociski_szamana.cosinus*szamani[i].pociski_szamana.predkosc;
+						szamani[i].pociski_szamana.y -= szamani[i].pociski_szamana.sinus*szamani[i].pociski_szamana.predkosc;
+					}// w lewo dol
+					if (szamani[i].pociski_szamana.kierunek == 3)
+					{
+						szamani[i].pociski_szamana.x -= szamani[i].pociski_szamana.cosinus*szamani[i].pociski_szamana.predkosc;
+						szamani[i].pociski_szamana.y += szamani[i].pociski_szamana.sinus*szamani[i].pociski_szamana.predkosc;
+					}
+					//w prawo gore
+					if (szamani[i].pociski_szamana.kierunek == 2)
+					{
+						szamani[i].pociski_szamana.x += szamani[i].pociski_szamana.cosinus*szamani[i].pociski_szamana.predkosc;
+						szamani[i].pociski_szamana.y -= szamani[i].pociski_szamana.sinus*szamani[i].pociski_szamana.predkosc;
+					}
+					// w prawo dol
+					if (szamani[i].pociski_szamana.kierunek == 1)
+					{
+						szamani[i].pociski_szamana.x += szamani[i].pociski_szamana.cosinus*szamani[i].pociski_szamana.predkosc;
+						szamani[i].pociski_szamana.y += szamani[i].pociski_szamana.sinus*szamani[i].pociski_szamana.predkosc;
+					}
+				}
+			}
+		}
+			
+	
+}
