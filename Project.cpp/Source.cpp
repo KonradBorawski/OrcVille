@@ -189,8 +189,8 @@ int pomocnicza_do_sprite_szamana = 0;
 const int ilosc_pociskow = 5; // ktore moga istniec jednoczesnie
 int RodzajPocisku=1; // 1-Fireball ,  2-Sopel , 3-Trucizna
 int ilosc_fireball=10000000;
-int ilosc_sopel=10;
-int ilosc_trucizna=10;
+int ilosc_sopel=20;
+int ilosc_trucizna=20;
 
 // kursor
 float kursor_x;
@@ -212,10 +212,6 @@ int pomocnicza_do_straty_hp2;
 // zegar
 int zegar;
 float czas = 0;
-
-// rest orka w tym samym miejscu
-float resp_prawo_gora_x = 0;
-float resp_prawo_gora_y = 0;
 
 // faza gry
 int faza_gry = 1; // 1 - menu glowne, 2 - jak grac, 3 - gra , 4 - sklep, 5 - wynik
@@ -260,7 +256,6 @@ int main(void) {
 	const float FPS = 60.0;
 	int ilosc_klatek = 0;
 
-
 	//przeciwnicy
 	Ork orkowie[50];
 	Szaman szamani[50];
@@ -301,8 +296,6 @@ int main(void) {
 			pom++;
 		}
 	}
-
-
 
 	// zmienne allegro
 	ALLEGRO_DISPLAY *okno = NULL;
@@ -435,7 +428,6 @@ int main(void) {
 	al_register_event_source(event_queue, al_get_display_event_source(okno));
 	al_register_event_source(event_queue, al_get_timer_event_source(timer));
 
-
 	//czcionka
 	ALLEGRO_FONT *font24 = al_load_ttf_font("font.ttf", 24, 0);
 	ALLEGRO_FONT *font36 = al_load_ttf_font("centuary.ttf", 36, 0);
@@ -450,12 +442,10 @@ int main(void) {
 	float kursor_x5;
 	float kursor_y5;
 
-	
 	// timer
 	al_start_timer(timer);
 
 	//ekran startowy
-	
 	al_draw_bitmap(Ekran_startowy, 0, 0, 0);
 	al_flip_display();
 	al_rest(1.5);
@@ -469,6 +459,7 @@ int main(void) {
 	float cena_trucizny5 = cena_trucizny*5;
 	float cena_sopla10 = cena_sopla*10;
 	float cena_trucizny10 = cena_trucizny*10;
+
 	while (!done)
 	{
 	if (faza_gry == 1)
@@ -733,13 +724,11 @@ int main(void) {
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y == mapa_y))
 						{
 							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
-							resp_prawo_gora_y -=predkosc_postaci ;
 						}
 						if ((pom_mapa_x == mapa_x) && (pom_mapa_y != mapa_y))
 						{
 							RuchPostaciW(pos_x, pos_y, ktoryX, ktoryY, predkosc_postaci);
 							pos_y += predkosc_mapy;
-							resp_prawo_gora_y -= predkosc_postaci;
 						}
 					}
 
@@ -1610,17 +1599,19 @@ int main(void) {
 				{
 					pos_hp = 100;
 					level++;
+					score += 100;
 					doswiadczenie -= 100;
 				}
 			}
 			if (level == 2)
 			{
 				level_up++;
-				score += 100;
+				
 				if (doswiadczenie >= 200)
 				{
 					pos_hp = 100;
 					level++;
+					score += 500;
 					doswiadczenie -= 200;
 					level_up = 0;
 				}
@@ -1628,11 +1619,12 @@ int main(void) {
 			if (level == 3)
 			{
 				level_up++;
-				score += 500;
+			
 				if (doswiadczenie >= 300)
 				{
 					pos_hp = 100;
 					level++;
+					score += 1000;
 					doswiadczenie -= 300;
 					level_up = 0;
 				}
@@ -1640,11 +1632,11 @@ int main(void) {
 			if (level == 4)
 			{
 				level_up++;
-				score += 1000;
 				if (doswiadczenie >= 400)
 				{
 					pos_hp = 100;
 					level++;
+					score += 1500;
 					doswiadczenie -= 400;
 					level_up = 0;
 				}
@@ -1652,11 +1644,11 @@ int main(void) {
 			if (level == 5)
 			{
 				level_up++;
-				score += 1500;
 				if (doswiadczenie >= 500)
 				{
 					pos_hp = 100;
 					level++;
+					score += 2000;
 					doswiadczenie -= 500;
 					level_up = 0;
 				}
@@ -1664,12 +1656,24 @@ int main(void) {
 			if (level == 6)
 			{
 				level_up++;
-				score += 2000;
 				if (doswiadczenie >= 600)
 				{
 					pos_hp = 100;
 					level++;
+					score += 4000;
 					doswiadczenie -= 600;
+					level_up = 0;
+				}
+			}
+			if (level == 7)
+			{
+				level_up++;
+				if (doswiadczenie >= 700)
+				{
+					pos_hp = 100;
+					level++;
+					score += 10000;
+					doswiadczenie -= 700;
 					level_up = 0;
 				}
 			}
